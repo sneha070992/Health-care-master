@@ -1,0 +1,54 @@
+pipeline {
+  agent any
+
+  stages {
+    stage('CheckOut') {
+      steps {
+        echo 'Checkout the source code from GitHub'
+	git 'https://github.com/sneha070992/Health-care-master.git'
+            }
+    }
+    stage('Package and Build Application') {
+      steps {
+        echo 'Build and Package App'
+        sh 'mvn clean package'
+           }
+    }
+    stage('Publish Reports using HTML') {
+      steps {
+        echo 'Publishing HTML Reports'
+	publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '/var/lib/jenkins/workspace/Healthcare-project', reportFiles: 'index.html', reportName: 'HTML Report', reportTitles: '', useWrapperFileDirectly: true])
+            }
+     }	    
+     stage('Image creation') {
+      steps {
+        sh 'docker build -t Snehanka/health-care:latest .'
+             }
+     }
+     stage('Docker Login') {
+       steps {
+         withCredentials([usernamePassword(credentialsId: 'Docker-Login', passwordVariable: 'dockerHubPassword', usernameVariable: 'dockerHubUser')]) {
+         sh "docker login -u ${env.dockerHubUser} -p ${env.dockerHubPassword}"
+	           }
+	     }
+      }
+      stage('Push Image to Docker Registry') {
+        steps {
+          sh 'docker push Snehanka/health-care:latest'
+              }
+       }	
+       stage ('chmod key') {
+       	steps {
+		sh 'sudo chmod 400 sneha1.pem'
+	}
+      }
+      stage ('Configure Test-server with Terraform'){
+     	 steps {
+        			sh 'terraform init'
+        			sh 'terraform validate'
+      			  sh 'terraform apply --auto-approve'
+               
+          }   
+       }
+}
+}
